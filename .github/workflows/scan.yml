@@ -5,6 +5,9 @@ on:
     - cron: "0 */3 * * *"   # every 3 hours
   workflow_dispatch: {}      # allow manual trigger from GitHub UI
 
+permissions:
+  contents: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -27,4 +30,16 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: python scanner.py
+        run: |
+          set -o pipefail
+          mkdir -p logs
+          python scanner.py 2>&1 | tee logs/last_run.log
+
+      - name: Commit debug log
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add logs/last_run.log
+          git commit -m "Update debug log [skip ci]" || echo "No changes to commit"
+          git push
