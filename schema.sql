@@ -13,13 +13,17 @@ create table if not exists tqna.topics (
 
 create index if not exists idx_tqna_topics_category on tqna.topics (category);
 
--- Required: Supabase's PostgREST API only exposes schemas listed in
--- Project Settings -> API -> "Exposed schemas". After running this file,
--- add "tqna" to that list (alongside "public") or the scanner's API calls
--- will fail with a schema-not-found error.
+-- Kill switch: a single-row settings table. Set paused = true to stop the
+-- scanner immediately (no forum/Groq/Telegram calls) without touching code
+-- or GitHub secrets. Flip back to false to resume.
+create table if not exists tqna.settings (
+    id integer primary key default 1,
+    paused boolean not null default false,
+    updated_at timestamptz not null default now()
+);
+insert into tqna.settings (id, paused) values (1, false)
+on conflict (id) do nothing;
 
--- Optional but recommended: grant the same roles PostgREST uses access
--- to the new schema (mirrors default "public" grants).
-grant usage on schema tqna to anon, authenticated, service_role;
-grant all on all tables in schema tqna to service_role;
-alter default privileges in schema tqna grant all on tables to service_role;
+-- Run these two statements separately (in their own query) after confirming
+-- the tables above were created successfully — grant failures must not roll
+-- back the table creation above.
