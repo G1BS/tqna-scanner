@@ -1,7 +1,54 @@
-Error scanning fundamental-analysis: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning technical-analysis: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning futures-options: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning stocks: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning algos-strategies-code: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning nifty-banknifty: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
-Error scanning the-daily-brief: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
+Groq summarization failed: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions
