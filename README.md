@@ -1,8 +1,9 @@
 # TQNA FA/TA Scanner
 
-Standalone scanner for tradingqna.com (Discourse forum, Zerodha's Q&A site).
-Fully separate from the ValuePickr scanner — own Supabase project, own
-Telegram bot, own Groq key, own GitHub repo.
+Scanner for tradingqna.com (Discourse forum, Zerodha's Q&A site).
+Shares the same Supabase project as vp-fa-scanner (free-tier caps you at 2
+projects) but lives in its own Postgres schema (`tqna`) for clean isolation.
+Own Telegram bot, own Groq key, own GitHub repo — only the DB host is shared.
 
 ## What it does
 
@@ -14,12 +15,16 @@ short activity ping. State is tracked in a Supabase table so nothing repeats.
 
 ## One-time setup
 
-### 1. Supabase (new project — do not reuse the ValuePickr one)
-1. Go to supabase.com → New project.
-2. Once created, open the SQL editor and run the contents of `schema.sql`.
-3. Go to Project Settings → API. Copy:
-   - `Project URL` → this is `SUPABASE_URL`
-   - `service_role` key (not the anon key) → this is `SUPABASE_KEY`
+### 1. Supabase (reuse the vp-fa-scanner project — new schema, not a new project)
+1. Open the **existing** vp-fa-scanner Supabase project.
+2. Open the SQL editor and run the contents of `schema.sql`. This creates a
+   new `tqna` schema with its own `topics` table, fully separate from
+   vp-fa-scanner's `public.vp_fa_topics` table.
+3. Go to Project Settings → API → **Exposed schemas**, and add `tqna` to the
+   list (it only shows `public` by default). Without this step the scanner's
+   API calls will fail.
+4. Copy the same `Project URL` and `service_role` key you already used for
+   vp-fa-scanner → these are `SUPABASE_URL` / `SUPABASE_KEY` for this project too.
 
 ### 2. Telegram bot (new bot — do not reuse the ValuePickr one)
 1. Message **@BotFather** on Telegram → `/newbot` → follow prompts.

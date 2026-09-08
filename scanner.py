@@ -3,8 +3,9 @@ TradingQnA (tradingqna.com) FA/TA scanner.
 Polls Discourse JSON API for selected categories, dedupes new topics/replies
 against Supabase, optionally summarizes with Groq, and sends Telegram alerts.
 
-Standalone project — separate Supabase project, Telegram bot, Groq key, and
-GitHub repo from the ValuePickr (vp-fa-scanner) project.
+Shares the same Supabase project as vp-fa-scanner (free-tier project limit),
+but lives in its own Postgres schema ("tqna") for clean isolation. Telegram
+bot, Groq key, and GitHub repo are still fully separate from vp-fa-scanner.
 """
 
 import os
@@ -12,7 +13,7 @@ import sys
 import time
 import requests
 from datetime import datetime, timezone
-from supabase import create_client
+from supabase import create_client, ClientOptions
 
 # ---------------------------------------------------------------------------
 # Config
@@ -37,10 +38,17 @@ TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")  # optional — summarization skipped if absent
 
-TABLE_NAME = "tqna_topics"
+SCHEMA_NAME = "tqna"
+TABLE_NAME = "topics"
 HEADERS = {"User-Agent": "tqna-fa-scanner/1.0"}
 
-sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Point the client at the "tqna" schema so this scanner's data lives
+# completely separately from vp-fa-scanner's tables in the same project.
+sb = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY,
+    options=ClientOptions(schema=SCHEMA_NAME),
+)
 
 
 # ---------------------------------------------------------------------------
