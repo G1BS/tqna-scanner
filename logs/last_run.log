@@ -1,0 +1,7 @@
+Error scanning fundamental-analysis: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning technical-analysis: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning futures-options: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning stocks: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning algos-strategies-code: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning nifty-banknifty: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
+Error scanning the-daily-brief: {'code': 'PGRST106', 'details': None, 'hint': 'Only the following schemas are exposed: public, graphql_public', 'message': 'Invalid schema: tqna'}
