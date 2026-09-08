@@ -1,7 +1,7 @@
-Error scanning fundamental-analysis: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning technical-analysis: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning futures-options: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning stocks: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning algos-strategies-code: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning nifty-banknifty: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
-Error scanning the-daily-brief: {'code': 'PGRST205', 'details': None, 'hint': None, 'message': "Could not find the table 'tqna.topics' in the schema cache"}
+Error scanning fundamental-analysis: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning technical-analysis: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning futures-options: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning stocks: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning algos-strategies-code: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning nifty-banknifty: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
+Error scanning the-daily-brief: {'code': '42501', 'details': None, 'hint': None, 'message': 'permission denied for schema tqna'}
