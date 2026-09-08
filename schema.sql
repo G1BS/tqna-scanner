@@ -13,17 +13,24 @@ create table if not exists tqna.topics (
 
 create index if not exists idx_tqna_topics_category on tqna.topics (category);
 
--- Kill switch: a single-row settings table. Set paused = true to stop the
--- scanner immediately (no forum/Groq/Telegram calls) without touching code
--- or GitHub secrets. Flip back to false to resume.
+-- Kill switch + daily alert budget tracking, single-row settings table.
+-- paused: set true to stop the scanner instantly (no code/secrets touch).
+-- daily_count / last_reset_date: rolling daily alert cap bookkeeping.
 create table if not exists tqna.settings (
     id integer primary key default 1,
     paused boolean not null default false,
+    daily_count integer not null default 0,
+    last_reset_date date not null default current_date,
     updated_at timestamptz not null default now()
 );
-insert into tqna.settings (id, paused) values (1, false)
+insert into tqna.settings (id, paused, daily_count, last_reset_date)
+values (1, false, 0, current_date)
 on conflict (id) do nothing;
 
--- Run these two statements separately (in their own query) after confirming
--- the tables above were created successfully — grant failures must not roll
--- back the table creation above.
+-- Safe to run even if tqna.settings already existed from an earlier setup
+-- (adds the new columns without touching existing data).
+alter table tqna.settings add column if not exists daily_count integer not null default 0;
+alter table tqna.settings add column if not exists last_reset_date date not null default current_date;
+
+-- Run schema_grants.sql separately, AFTER this succeeds — grant failures
+-- must not roll back the table creation above.

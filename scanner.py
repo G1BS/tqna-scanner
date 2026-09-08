@@ -30,14 +30,17 @@ from supabase import create_client, ClientOptions
 BASE_URL = "https://tradingqna.com"
 
 # category_slug: (category_id, human label)
-# Trimmed to the categories most likely to carry actionable trading/investing
-# signal. "F&O", "Stocks", and "The Daily Brief" were dropped — highest
-# volume, lowest signal (mostly broker/support chatter or generic news).
+# All 7 categories — noise gets removed by the keyword + relevance filters
+# below, not by dropping whole categories (F&O/Stocks/Daily Brief can carry
+# real hypothesis-worthy signal just as much as the others).
 CATEGORIES = {
     "fundamental-analysis": (15, "Fundamental Analysis"),
     "technical-analysis": (16, "Technical Analysis"),
+    "futures-options": (19, "F&O"),
+    "stocks": (13, "Stocks"),
     "algos-strategies-code": (6, "Algos, strategies, code"),
     "nifty-banknifty": (37, "Nifty & Bank Nifty"),
+    "the-daily-brief": (54, "The Daily Brief"),
 }
 
 # Stage 1 cheap filter: skip topics whose title matches these patterns —
@@ -56,6 +59,13 @@ MIN_RELEVANCE_SCORE = 4
 # Only ping about a known topic if it gained at least this many replies
 # since the last scan (kills noise from single-reply bumps).
 MIN_NEW_REPLIES_TO_ALERT = 3
+
+# Realistic daily volume target: cap total alerts (new topics + active
+# threads combined) per rolling UTC day, always keeping the highest-scoring
+# items first. Prevents a big backlog (e.g. first-ever run) or a noisy day
+# from flooding you — anything beyond the cap is simply not alerted (it's
+# still recorded in tqna.topics so it won't be silently lost from dedupe).
+DAILY_ALERT_CAP = 20
 
 # Color-bar emoji by relevance score (5 = must-read, 4 = worth a look).
 SCORE_COLOR = {5: "🟥", 4: "🟧"}
@@ -96,6 +106,45 @@ def is_paused() -> bool:
     except Exception as e:
         print(f"Kill switch check failed (defaulting to running): {e}", file=sys.stderr)
     return False
+
+
+# ---------------------------------------------------------------------------
+# Daily alert budget
+# ---------------------------------------------------------------------------
+
+def get_remaining_daily_budget() -> int:
+    """Resets the counter at UTC midnight, returns how many more alerts can
+    be sent today. Fails open (returns the full cap) if settings row/table
+    is missing, so a DB hiccup never silently blocks all alerts."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        res = sb.table(SETTINGS_TABLE).select("*").eq("id", 1).execute()
+        row = res.data[0] if res.data else {}
+        last_reset = row.get("last_reset_date")
+        daily_count = row.get("daily_count", 0) or 0
+
+        if last_reset != today:
+            daily_count = 0
+            sb.table(SETTINGS_TABLE).update({
+                "daily_count": 0, "last_reset_date": today,
+            }).eq("id", 1).execute()
+
+        return max(0, DAILY_ALERT_CAP - daily_count)
+    except Exception as e:
+        print(f"Daily budget check failed (defaulting to full cap): {e}", file=sys.stderr)
+        return DAILY_ALERT_CAP
+
+
+def record_alerts_sent(count: int):
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        res = sb.table(SETTINGS_TABLE).select("daily_count").eq("id", 1).execute()
+        current = (res.data[0].get("daily_count", 0) or 0) if res.data else 0
+        sb.table(SETTINGS_TABLE).update({
+            "daily_count": current + count, "last_reset_date": today,
+        }).eq("id", 1).execute()
+    except Exception as e:
+        print(f"Failed to record daily alert count: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +213,8 @@ def score_and_summarize(title: str, body: str, retries: int = 2):
                 timeout=25,
             )
             if resp.status_code == 429:
-                wait = 8 * (attempt + 1)
+                retry_after = resp.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else 8 * (attempt + 1)
                 print(f"Groq rate-limited, waiting {wait}s (attempt {attempt + 1})", file=sys.stderr)
                 time.sleep(wait)
                 continue
@@ -340,8 +390,30 @@ def main():
             print(f"Error scanning {slug}: {e}", file=sys.stderr)
         time.sleep(2)
 
-    send_digest(new_items, reply_items)
-    print(f"Run complete: {len(new_items)} high-value new topics, {len(reply_items)} active threads alerted.")
+    new_items.sort(key=lambda x: -x["score"])
+    reply_items.sort(key=lambda x: -x["new_replies"])
+
+    budget = get_remaining_daily_budget()
+    total_found = len(new_items) + len(reply_items)
+
+    if budget <= 0:
+        print(f"Daily alert cap ({DAILY_ALERT_CAP}) already reached — found "
+              f"{total_found} qualifying items but sending none today.")
+        return
+
+    # Fill the budget with highest-priority new topics first, then reply pings.
+    kept_new = new_items[:budget]
+    remaining = budget - len(kept_new)
+    kept_replies = reply_items[:remaining]
+
+    if total_found > len(kept_new) + len(kept_replies):
+        skipped = total_found - len(kept_new) - len(kept_replies)
+        print(f"Daily cap trimmed {skipped} lower-priority item(s) — sending "
+              f"top {len(kept_new)} new + {len(kept_replies)} thread alerts.")
+
+    send_digest(kept_new, kept_replies)
+    record_alerts_sent(len(kept_new) + len(kept_replies))
+    print(f"Run complete: {len(kept_new)} high-value new topics, {len(kept_replies)} active threads alerted.")
 
 
 if __name__ == "__main__":

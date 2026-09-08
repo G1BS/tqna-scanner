@@ -8,9 +8,10 @@ Own Telegram bot, own Groq key, own GitHub repo — only the DB host is shared.
 ## What it does
 
 Every 3 hours:
-1. Polls 4 categories (Fundamental Analysis, Technical Analysis, Algos/
-   strategies/code, Nifty & Bank Nifty) — trimmed down from the original 7 to
-   drop high-noise, low-signal categories (F&O, Stocks, Daily Brief).
+1. Polls all 7 categories (Fundamental Analysis, Technical Analysis, F&O,
+   Stocks, Algos/strategies/code, Nifty & Bank Nifty, The Daily Brief) —
+   nothing dropped by category, since hypothesis-worthy signal shows up
+   across all of them. Noise is filtered by content, not by category.
 2. **Stage 1 filter**: skips any topic whose title matches broker/support
    noise patterns (KYC, OTP, login issues, complaints, etc.) — free, no API
    calls spent on obvious junk.
@@ -19,10 +20,19 @@ Every 3 hours:
    summarizes the post. Only topics scoring 4+ make it into the alert.
 4. For existing topics, only alerts if they gained 3+ replies since the last
    scan (single-reply bumps are skipped).
-5. Sends **one digest message per run** (not one message per topic), sorted
+5. **Daily alert cap (20/day by default)**: even after filtering, a busy day
+   or a big backlog (e.g. the very first run) could still send a lot. A
+   rolling daily counter caps total alerts (new topics + active threads
+   combined) at `DAILY_ALERT_CAP`, always keeping the highest-scoring items
+   first — anything beyond the cap on a given day is simply not alerted
+   (though it's still recorded, so it won't be re-scored pointlessly later).
+6. Sends **one digest message per run** (not one message per topic), sorted
    by importance, with a color bar: 🟥 = score 5 (must-read), 🟧 = score 4.
    Active threads get a 💬 line. If nothing qualifies, no message is sent at
    all — no flooding.
+7. Groq calls are paced (3s apart) and back off on rate limits (respecting
+   the `Retry-After` header when Groq sends one), with a resilient JSON
+   parser that salvages a score even if the model's response gets cut off.
 
 State is tracked in `tqna.topics` (Supabase) so nothing repeats.
 
@@ -97,6 +107,7 @@ Set it back to `false` whenever you want it to resume.
 - **Denylist keywords**: edit `TITLE_DENYLIST` in `scanner.py`.
 - **Relevance bar**: edit `MIN_RELEVANCE_SCORE` (default 4 out of 5).
 - **Reply-alert threshold**: edit `MIN_NEW_REPLIES_TO_ALERT` (default 3).
+- **Daily alert cap**: edit `DAILY_ALERT_CAP` in `scanner.py` (default 20/day).
 
 ## Cost notes
 - Discourse JSON API: free, no auth needed.
