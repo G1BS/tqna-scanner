@@ -127,7 +127,7 @@ def fetch_topic_excerpt(topic_id: int) -> str:
 # Groq: combined relevance score + summary in a single call
 # ---------------------------------------------------------------------------
 
-def score_and_summarize(title: str, body: str):
+def score_and_summarize(title: str, body: str, retries: int = 2):
     """
     Returns (score: int 1-5, summary: str).
     Score reflects how actionable/valuable the post is for a trading/investing
@@ -143,32 +143,58 @@ def score_and_summarize(title: str, body: str):
         "Rate this forum post's value to an active trader/investor on a "
         "1-5 scale (5 = high-conviction thesis/strategy/analysis worth "
         "reading now, 3 = generic/ok, 1 = noise/spam/off-topic). "
-        "Then give a 2-3 sentence plain-language summary.\n\n"
+        "Then give a 2-3 sentence plain-language summary with no line "
+        "breaks inside it.\n\n"
         f"Title: {title}\n\nPost:\n{body}\n\n"
-        'Respond ONLY as JSON: {"score": <int 1-5>, "summary": "<text>"}'
+        "Respond with ONLY one line of valid JSON, nothing else, no markdown "
+        'fences: {"score": <int 1-5>, "summary": "<one paragraph, no newlines>"}'
     )
-    try:
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-            json={
-                "model": "openai/gpt-oss-20b",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 250,
-                "temperature": 0.2,
-            },
-            timeout=20,
-        )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"].strip()
-        content = re.sub(r"^```(json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
-        parsed = json.loads(content)
-        score = int(parsed.get("score", 3))
-        summary = str(parsed.get("summary", body[:300])).strip()
-        return max(1, min(5, score)), summary
-    except Exception as e:
-        print(f"Groq scoring failed, including with neutral score: {e}", file=sys.stderr)
-        return 3, body[:300]
+
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                json={
+                    "model": "openai/gpt-oss-20b",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 500,
+                    "temperature": 0.2,
+                },
+                timeout=25,
+            )
+            if resp.status_code == 429:
+                wait = 8 * (attempt + 1)
+                print(f"Groq rate-limited, waiting {wait}s (attempt {attempt + 1})", file=sys.stderr)
+                time.sleep(wait)
+                continue
+
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"].strip()
+            content = re.sub(r"^```(json)?|```$", "", content, flags=re.MULTILINE).strip()
+
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError:
+                # Model likely got cut off or added stray text — salvage what we can:
+                # pull the score with a regex and use the rest of the content as summary.
+                score_match = re.search(r'"score"\s*:\s*(\d)', content)
+                summary_match = re.search(r'"summary"\s*:\s*"(.*)', content, re.DOTALL)
+                score = int(score_match.group(1)) if score_match else 3
+                summary = summary_match.group(1).rstrip('"} \n') if summary_match else body[:300]
+                return max(1, min(5, score)), summary
+
+            score = int(parsed.get("score", 3))
+            summary = str(parsed.get("summary", body[:300])).strip()
+            return max(1, min(5, score)), summary
+
+        except Exception as e:
+            print(f"Groq scoring failed, including with neutral score: {e}", file=sys.stderr)
+            return 3, body[:300]
+
+    # Exhausted retries (all 429s)
+    print("Groq rate limit persisted after retries, including with neutral score", file=sys.stderr)
+    return 3, body[:300]
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +303,7 @@ def scan_category(slug: str, category_id: int, label: str, new_items: list, repl
         if known is None:
             excerpt = fetch_topic_excerpt(topic_id)
             score, summary = score_and_summarize(title, excerpt)
+            time.sleep(3)  # pace Groq calls to stay under free-tier rate limit
             upsert_topic(topic_id, slug, posts_count, title)  # record regardless of score
 
             if score >= MIN_RELEVANCE_SCORE:
