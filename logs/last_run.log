@@ -1,3 +1,1 @@
-Daily budget check failed (defaulting to full cap): {'code': 'PGRST204', 'details': None, 'hint': None, 'message': "Could not find the 'daily_count' column of 'settings' in the schema cache"}
-Failed to record daily alert count: {'code': '42703', 'details': None, 'hint': None, 'message': 'column settings.daily_count does not exist'}
 Run complete: 0 high-value new topics, 0 active threads alerted.
