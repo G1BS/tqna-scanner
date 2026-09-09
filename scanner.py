@@ -75,6 +75,14 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")  # optional — falls back to raw excerpt if absent
+TEST_LIMIT = os.environ.get("TEST_LIMIT")  # optional: cap topics scanned per category, for cheap manual tests
+TEST_LIMIT = int(TEST_LIMIT) if TEST_LIMIT else None
+# Optional: comma-separated topic IDs to force through extraction + digest
+# regardless of dedupe/score, for testing the prompt on specific real posts
+# without touching real dedupe history or the score threshold.
+TEST_FORCE_TOPIC_IDS = set(
+    int(x) for x in os.environ.get("TEST_FORCE_TOPIC_IDS", "").split(",") if x.strip()
+)
 
 SCHEMA_NAME = "tqna"
 TOPICS_TABLE = "topics"
@@ -397,8 +405,36 @@ def send_digest(new_items: list, reply_items: list):
 # Main scan
 # ---------------------------------------------------------------------------
 
+def test_forced_topics(new_items: list):
+    """Directly fetch and score specific topic IDs (via TEST_FORCE_TOPIC_IDS),
+    bypassing category listings and dedupe — for testing the extraction
+    prompt on real, chosen posts without touching real dedupe state."""
+    for topic_id in TEST_FORCE_TOPIC_IDS:
+        try:
+            url = f"{BASE_URL}/t/{topic_id}.json"
+            resp = requests.get(url, headers=HEADERS, timeout=20)
+            resp.raise_for_status()
+            data = resp.json()
+            title = data.get("title", f"Topic {topic_id}")
+            slug = data.get("slug", str(topic_id))
+            topic_url = f"{BASE_URL}/t/{slug}/{topic_id}"
+
+            thread = fetch_topic_thread(topic_id)
+            score, extraction = score_and_summarize(title, thread)
+            time.sleep(3)
+
+            new_items.append({
+                "label": "TEST", "title": title, "url": topic_url,
+                "score": score, "extraction": extraction,
+            })
+        except Exception as e:
+            print(f"Forced test topic {topic_id} failed: {e}", file=sys.stderr)
+
+
 def scan_category(slug: str, category_id: int, label: str, new_items: list, reply_items: list):
     topics = fetch_category_topics(category_id)
+    if TEST_LIMIT:
+        topics = topics[:TEST_LIMIT]
     for t in topics:
         topic_id = t["id"]
         title = t["title"]
@@ -443,12 +479,16 @@ def main():
     new_items = []
     reply_items = []
 
-    for slug, (category_id, label) in CATEGORIES.items():
-        try:
-            scan_category(slug, category_id, label, new_items, reply_items)
-        except Exception as e:
-            print(f"Error scanning {slug}: {e}", file=sys.stderr)
-        time.sleep(2)
+    if TEST_FORCE_TOPIC_IDS:
+        print(f"TEST MODE: forcing extraction on topic IDs {TEST_FORCE_TOPIC_IDS}, skipping normal category scan.")
+        test_forced_topics(new_items)
+    else:
+        for slug, (category_id, label) in CATEGORIES.items():
+            try:
+                scan_category(slug, category_id, label, new_items, reply_items)
+            except Exception as e:
+                print(f"Error scanning {slug}: {e}", file=sys.stderr)
+            time.sleep(2)
 
     new_items.sort(key=lambda x: -x["score"])
     reply_items.sort(key=lambda x: -x["new_replies"])
