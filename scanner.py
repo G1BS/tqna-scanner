@@ -159,17 +159,26 @@ def fetch_category_topics(category_id: int):
     return resp.json().get("topic_list", {}).get("topics", [])
 
 
-def fetch_topic_excerpt(topic_id: int) -> str:
-    """Fetch the first post of a topic for a scoring/summary source."""
+def fetch_topic_thread(topic_id: int, max_posts: int = 8) -> str:
+    """Fetch the first post plus up to max_posts-1 replies, so the LLM can
+    see corrections/alternative views from other users, not just the OP."""
     url = f"{BASE_URL}/t/{topic_id}.json"
     resp = requests.get(url, headers=HEADERS, timeout=20)
     resp.raise_for_status()
-    posts = resp.json().get("post_stream", {}).get("posts", [])
+    posts = resp.json().get("post_stream", {}).get("posts", [])[:max_posts]
     if not posts:
         return ""
-    raw = posts[0].get("cooked", "")
-    text = re.sub("<[^<]+?>", "", raw)  # crude tag strip
-    return text.strip()[:1500]
+
+    parts = []
+    for i, p in enumerate(posts):
+        raw = p.get("cooked", "")
+        text = re.sub("<[^<]+?>", "", raw).strip()
+        if not text:
+            continue
+        role = "OP" if i == 0 else f"Reply {i}"
+        parts.append(f"[{role}]: {text}")
+
+    return "\n\n".join(parts)[:6000]
 
 
 # ---------------------------------------------------------------------------
@@ -178,25 +187,53 @@ def fetch_topic_excerpt(topic_id: int) -> str:
 
 def score_and_summarize(title: str, body: str, retries: int = 2):
     """
-    Returns (score: int 1-5, summary: str).
+    Returns (score: int 1-5, extraction: dict).
     Score reflects how actionable/valuable the post is for a trading/investing
     audience (5 = high-conviction thesis, strategy, or analysis; 1 = noise).
-    Falls back to score=3 (neutral, included) and raw excerpt if Groq is
-    unavailable or fails, so a Groq outage never silently kills all alerts.
+    extraction is a structured analysis (subject, strategy, rules, risks,
+    etc.) — not just a reworded summary of the raw text.
+    Falls back to score=3 (neutral, included) with a minimal extraction if
+    Groq is unavailable or fails, so a Groq outage never silently kills all
+    alerts.
     """
+    fallback = {"subject": "other", "main_idea": body[:300], "strategy": "",
+                "rules": "", "key_points": "", "examples": "",
+                "risks": "", "useful_replies": "", "terms": ""}
+
     if not GROQ_API_KEY or not body:
-        return 3, body[:300]
+        return 3, fallback
 
     prompt = (
-        "You are filtering posts for a trading/investing alert feed. "
-        "Rate this forum post's value to an active trader/investor on a "
-        "1-5 scale (5 = high-conviction thesis/strategy/analysis worth "
-        "reading now, 3 = generic/ok, 1 = noise/spam/off-topic). "
-        "Then give a 2-3 sentence plain-language summary with no line "
-        "breaks inside it.\n\n"
-        f"Title: {title}\n\nPost:\n{body}\n\n"
+        "Read this TradingQnA post/thread and extract only the useful "
+        "trading/investing knowledge.\n\n"
+        "First identify the subject: investment, swing, intraday, F&O, "
+        "options, futures, technical analysis, fundamental analysis, algo, "
+        "backtesting, stocks, commodities, IPO, taxation, platform/tools, "
+        "or other.\n\n"
+        "Then concisely extract:\n"
+        "- Main idea — what is being discussed?\n"
+        "- Strategy/Method — how does it work?\n"
+        "- Rules — entry, exit, conditions, filters, risk management, if applicable.\n"
+        "- Key points — important and non-obvious insights.\n"
+        "- Examples/Data — trades, numbers, backtests, performance claims.\n"
+        "- Risks/Limitations — when it may fail or what to watch out for.\n"
+        "- Useful replies — important corrections, additions, or alternative "
+        "views from other users.\n"
+        "- Important terms — stocks, indices, indicators, strategies, tools, etc.\n\n"
+        "Ignore greetings, repetition, generic opinions, and irrelevant discussion. "
+        "Do not invent information. Clearly distinguish facts from personal "
+        "claims or opinions. Keep the output concise and information-dense. "
+        "Use empty strings for any field with nothing genuinely useful to report.\n\n"
+        "Also rate this post's value to an active trader/investor on a 1-5 "
+        "scale (5 = high-conviction thesis/strategy/analysis worth reading "
+        "now, 3 = generic/ok, 1 = noise/spam/off-topic with no real content).\n\n"
+        f"Title: {title}\n\nThread:\n{body}\n\n"
         "Respond with ONLY one line of valid JSON, nothing else, no markdown "
-        'fences: {"score": <int 1-5>, "summary": "<one paragraph, no newlines>"}'
+        'fences: {"score": <int 1-5>, "subject": "<one of the categories above>", '
+        '"main_idea": "<text, no newlines>", "strategy": "<text, no newlines>", '
+        '"rules": "<text, no newlines>", "key_points": "<text, no newlines>", '
+        '"examples": "<text, no newlines>", "risks": "<text, no newlines>", '
+        '"useful_replies": "<text, no newlines>", "terms": "<comma-separated>"}'
     )
 
     for attempt in range(retries + 1):
@@ -207,10 +244,10 @@ def score_and_summarize(title: str, body: str, retries: int = 2):
                 json={
                     "model": "openai/gpt-oss-20b",
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
+                    "max_tokens": 900,
                     "temperature": 0.2,
                 },
-                timeout=25,
+                timeout=30,
             )
             if resp.status_code == 429:
                 retry_after = resp.headers.get("Retry-After")
@@ -226,25 +263,25 @@ def score_and_summarize(title: str, body: str, retries: int = 2):
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError:
-                # Model likely got cut off or added stray text — salvage what we can:
-                # pull the score with a regex and use the rest of the content as summary.
+                # Model likely got cut off — salvage at least the score,
+                # keep the rest of the extraction empty rather than guessing.
                 score_match = re.search(r'"score"\s*:\s*(\d)', content)
-                summary_match = re.search(r'"summary"\s*:\s*"(.*)', content, re.DOTALL)
                 score = int(score_match.group(1)) if score_match else 3
-                summary = summary_match.group(1).rstrip('"} \n') if summary_match else body[:300]
-                return max(1, min(5, score)), summary
+                return max(1, min(5, score)), fallback
 
             score = int(parsed.get("score", 3))
-            summary = str(parsed.get("summary", body[:300])).strip()
-            return max(1, min(5, score)), summary
+            extraction = {k: str(parsed.get(k, "")).strip() for k in
+                          ("subject", "main_idea", "strategy", "rules", "key_points",
+                           "examples", "risks", "useful_replies", "terms")}
+            return max(1, min(5, score)), extraction
 
         except Exception as e:
-            print(f"Groq scoring failed, including with neutral score: {e}", file=sys.stderr)
-            return 3, body[:300]
+            print(f"Groq extraction failed, including with neutral score: {e}", file=sys.stderr)
+            return 3, fallback
 
     # Exhausted retries (all 429s)
     print("Groq rate limit persisted after retries, including with neutral score", file=sys.stderr)
-    return 3, body[:300]
+    return 3, fallback
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +323,33 @@ def send_telegram(text: str):
         print(f"Telegram send failed: {resp.text}", file=sys.stderr)
 
 
+def format_extraction_block(it: dict) -> str:
+    """Render one topic's structured extraction as a compact Telegram block."""
+    ex = it["extraction"]
+    bar = SCORE_COLOR.get(it["score"], "🟨")
+    lines = [
+        f"{bar} <b>[{ex.get('subject', 'other')}] {it['label']}</b>",
+        f"<a href='{it['url']}'>{it['title']}</a>",
+    ]
+    if ex.get("main_idea"):
+        lines.append(f"<b>Idea:</b> {ex['main_idea']}")
+    if ex.get("strategy"):
+        lines.append(f"<b>Strategy:</b> {ex['strategy']}")
+    if ex.get("rules"):
+        lines.append(f"<b>Rules:</b> {ex['rules']}")
+    if ex.get("key_points"):
+        lines.append(f"<b>Key points:</b> {ex['key_points']}")
+    if ex.get("examples"):
+        lines.append(f"<b>Data:</b> {ex['examples']}")
+    if ex.get("risks"):
+        lines.append(f"<b>Risks:</b> {ex['risks']}")
+    if ex.get("useful_replies"):
+        lines.append(f"<b>Notable replies:</b> {ex['useful_replies']}")
+    if ex.get("terms"):
+        lines.append(f"<b>Terms:</b> {ex['terms']}")
+    return "\n".join(lines)
+
+
 def send_digest(new_items: list, reply_items: list):
     """Build and send one (or a few, if long) digest message(s) instead of
     one message per topic — sorted so the most important items lead."""
@@ -299,11 +363,7 @@ def send_digest(new_items: list, reply_items: list):
     if new_items:
         lines.append(f"<b>New topics ({len(new_items)})</b>")
         for it in new_items:
-            bar = SCORE_COLOR.get(it["score"], "🟨")
-            lines.append(
-                f"{bar} <b>{it['label']}</b> — <a href='{it['url']}'>{it['title']}</a>\n"
-                f"{it['summary']}"
-            )
+            lines.append(format_extraction_block(it))
         lines.append("")
 
     if reply_items:
@@ -351,15 +411,15 @@ def scan_category(slug: str, category_id: int, label: str, new_items: list, repl
         known = get_known_topic(topic_id)
 
         if known is None:
-            excerpt = fetch_topic_excerpt(topic_id)
-            score, summary = score_and_summarize(title, excerpt)
+            thread = fetch_topic_thread(topic_id)
+            score, extraction = score_and_summarize(title, thread)
             time.sleep(3)  # pace Groq calls to stay under free-tier rate limit
             upsert_topic(topic_id, slug, posts_count, title)  # record regardless of score
 
             if score >= MIN_RELEVANCE_SCORE:
                 new_items.append({
                     "label": label, "title": title, "url": topic_url,
-                    "score": score, "summary": summary,
+                    "score": score, "extraction": extraction,
                 })
 
         elif posts_count > known["last_posts_count"]:
