@@ -34,3 +34,7 @@ alter table tqna.settings add column if not exists last_reset_date date not null
 
 -- Run schema_grants.sql separately, AFTER this succeeds — grant failures
 -- must not roll back the table creation above.
+
+-- For the Telegram /scan command listener — tracks the last processed
+-- Telegram update ID so a command is never re-processed.
+alter table tqna.settings add column if not exists last_telegram_update_id bigint not null default 0;

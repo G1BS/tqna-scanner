@@ -44,6 +44,18 @@ Editor and set `paused` to `true`. The next scheduled run will log a message
 and exit immediately (no forum calls, no Groq spend, no Telegram messages).
 Set it back to `false` whenever you want it to resume.
 
+## On-demand scans
+
+Two ways to trigger a scan outside the daily 4 PM UTC schedule:
+
+1. **Telegram command**: send `/scan` in the bot's chat/channel. A separate
+   lightweight workflow polls Telegram every 5 minutes for this command —
+   when it sees one, it replies "Scan requested..." and runs the full
+   scanner immediately, then "Scan complete." when done. No GitHub access
+   needed at all.
+2. **GitHub Actions manual trigger**: Actions tab → "TQNA FA/TA Scanner" →
+   Run workflow (works from the GitHub mobile app too).
+
 ## One-time setup
 
 ### 1. Supabase (reuse the vp-fa-scanner project — new schema, not a new project)
