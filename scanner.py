@@ -70,6 +70,28 @@ DAILY_ALERT_CAP = 20
 # Color-bar emoji by relevance score (5 = must-read, 4 = worth a look).
 SCORE_COLOR = {5: "🟥", 4: "🟧"}
 
+# Subject-type differentiator — distinct from the score color bar above, so
+# you can tell strategy type at a glance (e.g. algo vs swing vs options)
+# independent of how highly it scored.
+SUBJECT_ICON = {
+    "investment": "📈",
+    "swing": "🌊",
+    "intraday": "⚡",
+    "f&o": "🎯",
+    "options": "🎯",
+    "futures": "🎯",
+    "technical analysis": "📉",
+    "fundamental analysis": "🏦",
+    "algo": "🤖",
+    "backtesting": "🧪",
+    "stocks": "📊",
+    "commodities": "🛢️",
+    "ipo": "🆕",
+    "taxation": "🧾",
+    "platform/tools": "🛠️",
+    "other": "🔹",
+}
+
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -334,9 +356,11 @@ def send_telegram(text: str):
 def format_extraction_block(it: dict) -> str:
     """Render one topic's structured extraction as a compact Telegram block."""
     ex = it["extraction"]
+    subject = ex.get("subject", "other").lower()
     bar = SCORE_COLOR.get(it["score"], "🟨")
+    icon = SUBJECT_ICON.get(subject, "🔹")
     lines = [
-        f"{bar} <b>[{ex.get('subject', 'other')}] {it['label']}</b>",
+        f"{bar}{icon} <b>[{subject}] {it['label']}</b>",
         f"<a href='{it['url']}'>{it['title']}</a>",
     ]
     if ex.get("main_idea"):
@@ -492,6 +516,13 @@ def main():
 
     new_items.sort(key=lambda x: -x["score"])
     reply_items.sort(key=lambda x: -x["new_replies"])
+
+    if TEST_FORCE_TOPIC_IDS:
+        # Test mode bypasses the daily cap and doesn't consume real budget —
+        # this is a deliberate manual check, not organic alert volume.
+        send_digest(new_items, reply_items)
+        print(f"TEST MODE complete: {len(new_items)} topics extracted and sent.")
+        return
 
     budget = get_remaining_daily_budget()
     total_found = len(new_items) + len(reply_items)
