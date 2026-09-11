@@ -48,45 +48,13 @@ Set it back to `false` whenever you want it to resume.
 
 Two ways to trigger a scan outside the daily 4 PM UTC schedule:
 
-1. **Telegram command (instant)**: send `/scan` in the bot's chat/channel.
-   A Supabase Edge Function receives it the moment you send it (Telegram
-   webhook, not polling) and immediately triggers the GitHub scan — no
-   multi-minute delay. Replies "Scan requested..." right away, then
-   "Scan complete." when the digest is ready. One-time setup below.
+1. **Telegram command**: send `/scan` (or `scan`, `/run`, `run`) in the
+   bot's chat/channel. A lightweight listener workflow checks Telegram every
+   5 minutes and, if it sees the command, immediately triggers the real
+   scan via the GitHub API — replies "Scan triggered - starting shortly."
+   Same pattern as the working `/scan` command on the ValuePickr project.
 2. **GitHub Actions manual trigger**: Actions tab → "TQNA FA/TA Scanner" →
    Run workflow (works from the GitHub mobile app too).
-
-### Setting up the instant /scan command
-
-This needs the Supabase CLI, since deploying an Edge Function requires your
-own Supabase login (can't be done on your behalf).
-
-1. Install the CLI: `npm install -g supabase`
-2. Log in: `supabase login` (opens a browser to authorize)
-3. Link this repo's checkout to your project:
-   `supabase link --project-ref vnvtcqadhhpywlvysjqu`
-4. Deploy the function:
-   `supabase functions deploy telegram-webhook --no-verify-jwt`
-5. Set its secrets (uses a **new, separate** GitHub PAT — see step 6 — plus
-   your existing Telegram values):
-   ```
-   supabase secrets set TELEGRAM_BOT_TOKEN=<your tqna bot token>
-   supabase secrets set TELEGRAM_CHAT_ID=<your tqna chat id>
-   supabase secrets set GITHUB_TOKEN=<a GitHub PAT with "repo" + "workflow" scope>
-   supabase secrets set GITHUB_REPO=G1BS/tqna-scanner
-   ```
-6. Create that GitHub PAT: github.com → Settings → Developer settings →
-   Personal access tokens → generate one scoped to **just this repo**, with
-   `Actions: read and write` permission (classic tokens: check `repo` +
-   `workflow` scopes). Keep it separate from any token used elsewhere.
-7. Point Telegram at the deployed function (replace `<FUNCTION_URL>` with
-   the URL `supabase functions deploy` printed, and `<BOT_TOKEN>` with your
-   tqna bot's token):
-   ```
-   curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<FUNCTION_URL>"
-   ```
-8. Test: send `/scan` in the Telegram chat — you should get the
-   "Scan requested..." reply within a second or two.
 
 ## One-time setup
 

@@ -1,0 +1,32 @@
+name: Telegram Command Listener
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # checks Telegram every 5 minutes - cheap, no LLM tokens used
+  workflow_dispatch: {}
+
+permissions:
+  contents: read   # needed for actions/checkout
+  actions: write   # needed to trigger scan.yml via the API
+
+jobs:
+  listen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests
+
+      - run: python listener.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
