@@ -508,10 +508,16 @@ def main():
         test_forced_topics(new_items)
     else:
         for slug, (category_id, label) in CATEGORIES.items():
-            try:
-                scan_category(slug, category_id, label, new_items, reply_items)
-            except Exception as e:
-                print(f"Error scanning {slug}: {e}", file=sys.stderr)
+            for attempt in range(2):  # one retry on transient errors (timeouts, etc.)
+                try:
+                    scan_category(slug, category_id, label, new_items, reply_items)
+                    break
+                except Exception as e:
+                    if attempt == 0:
+                        print(f"Error scanning {slug} (retrying once): {e}", file=sys.stderr)
+                        time.sleep(5)
+                    else:
+                        print(f"Error scanning {slug} (gave up after retry): {e}", file=sys.stderr)
             time.sleep(2)
 
     new_items.sort(key=lambda x: -x["score"])
