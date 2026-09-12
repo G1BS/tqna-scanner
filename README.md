@@ -48,13 +48,90 @@ Set it back to `false` whenever you want it to resume.
 
 Two ways to trigger a scan outside the daily 4 PM UTC schedule:
 
-1. **Telegram command**: send `/scan` (or `scan`, `/run`, `run`) in the
-   bot's chat/channel. A lightweight listener workflow checks Telegram every
-   5 minutes and, if it sees the command, immediately triggers the real
-   scan via the GitHub API — replies "Scan triggered - starting shortly."
-   Same pattern as the working `/scan` command on the ValuePickr project.
+1. **Telegram command (instant, ~1-2 sec)**: send `scan` (or `/scan`, `run`,
+   `/run`) in the bot's chat/channel. A Cloudflare Worker receives it the
+   moment you send it — Telegram pushes the message to the Worker directly,
+   there's no polling/cron involved — and immediately triggers the GitHub
+   scan. One-time setup below (~10 minutes, browser only, no CLI).
 2. **GitHub Actions manual trigger**: Actions tab → "TQNA FA/TA Scanner" →
    Run workflow (works from the GitHub mobile app too).
+
+### Why not GitHub Actions cron for this?
+
+We tried that first (checking Telegram every 5 minutes via a scheduled
+workflow). It's unreliable: GitHub deliberately deprioritizes and delays
+frequent scheduled workflows, so "every 5 minutes" can actually mean
+2-5 hour gaps in practice. A webhook (Telegram pushes to us) doesn't have
+this problem — there's no schedule to be late for.
+
+### Setting up the instant webhook (one-time, ~10 min, browser only)
+
+**Step 1 — Create a Cloudflare account (free)**
+Go to https://dash.cloudflare.com/sign-up and sign up (email + password).
+No credit card needed for the free tier.
+
+**Step 2 — Create the Worker**
+1. In the Cloudflare dashboard, go to **Workers & Pages** (left sidebar).
+2. Click **Create** → **Workers** → **Create Worker**.
+3. Give it a name, e.g. `tqna-telegram-webhook` — this becomes part of its
+   URL (`https://tqna-telegram-webhook.<your-subdomain>.workers.dev`).
+4. Click **Deploy** to create it with the default "Hello World" code (we'll
+   replace this next).
+
+**Step 3 — Paste the actual code**
+1. On the Worker's page, click **Edit code** (sometimes labeled "Quick edit").
+2. Delete everything in the editor and paste the full contents of
+   `cloudflare-webhook/worker.js` from this repo.
+3. Click **Save and deploy**.
+
+**Step 4 — Add the secrets it needs**
+1. Go to the Worker's **Settings** tab → **Variables and Secrets**.
+2. Add each of these as a variable, clicking **Encrypt** for each so they're
+   stored as secrets (not visible in plain text afterward):
+   - `TELEGRAM_BOT_TOKEN` — your tqna bot's token (same one already in the
+     GitHub repo secrets)
+   - `TELEGRAM_CHAT_ID` — your tqna chat ID (same one already in GitHub)
+   - `GITHUB_REPO` — `G1BS/tqna-scanner`
+   - `GITHUB_TOKEN` — a **new** GitHub PAT (see Step 5 — don't reuse an
+     existing one, keep this scoped narrowly)
+3. Click **Save and deploy** again after adding them.
+
+**Step 5 — Create the GitHub token the Worker will use**
+1. Go to https://github.com/settings/tokens?type=beta (fine-grained tokens
+   — narrower and safer than a classic PAT).
+2. Click **Generate new token**.
+3. Under **Repository access**, choose **Only select repositories** →
+   pick `tqna-scanner`.
+4. Under **Permissions** → **Repository permissions**, find **Actions** and
+   set it to **Read and write**.
+5. Generate the token, copy it, and paste it as the Worker's `GITHUB_TOKEN`
+   secret from Step 4 (you won't be able to see it again after leaving the
+   page, so paste it right away).
+
+**Step 6 — Point Telegram at the Worker**
+Get your Worker's URL from its Cloudflare dashboard page (looks like
+`https://tqna-telegram-webhook.<subdomain>.workers.dev`). Then, from any
+terminal (your phone's browser address bar works too, since this is just a
+GET request — or use a site like reqbin.com to fire it):
+```
+https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=<YOUR_WORKER_URL>
+```
+Replace `<YOUR_BOT_TOKEN>` with your tqna bot's token and `<YOUR_WORKER_URL>`
+with the Worker URL. You should get back `{"ok":true,"result":true,...}`.
+
+**Step 7 — Test it**
+Send `scan` in the Telegram chat. You should see "Scan triggered - starting
+shortly." within 1-2 seconds, followed by the real digest once the scan
+workflow completes.
+
+### Optional hardening
+To stop random internet traffic from hitting your Worker URL and pretending
+to be Telegram, set a secret token when calling `setWebhook`:
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=<WORKER_URL>&secret_token=<make up a random string>
+```
+Then add that same random string as the Worker's `WEBHOOK_SECRET` variable
+(Step 4) — the code already checks for it if present.
 
 ## One-time setup
 
